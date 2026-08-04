@@ -1,4 +1,10 @@
-import { createComponent, createContext, omit, useContext } from 'solid-js'
+import {
+  createComponent,
+  createContext,
+  omit,
+  untrack,
+  useContext,
+} from 'solid-js'
 import { createFieldGroup } from './createFieldGroup'
 import { createForm } from './createForm'
 import { mergeObjects } from './merge-objects'
@@ -356,17 +362,27 @@ export function createFormHook<
     const AppField = ((_props) => {
       // `omit` replaces `splitProps`, returning ONLY the rest — a live proxy
       // that preserves per-key tracking, so the spread below stays reactive.
-      // The picked half is read straight off `_props`, and reading it inside
-      // the children callback rather than in the untracked component body is
-      // strictly better than the Solid 1 shape it replaces.
       const fieldProps = omit(_props, 'children')
+      /**
+       * `children` is a render prop, read once by construction: `createComponent`
+       * runs a component body inside `untrack`, so reading it down in the
+       * callback is NOT more reactive than reading it here — it is the same
+       * one-shot read Solid 1's `splitProps` did, just later. What it is
+       * additionally is loud: when `_props` arrives as a reactive proxy (which
+       * it does through `fieldGroup.AppField`, whose spread of
+       * `getFormFieldOptions` produces one) the read is reported as
+       * [STRICT_READ_UNTRACKED], twice per field group in
+       * examples/solid/large-form. Hoisting it under `untrack` states the
+       * one-shot intent instead of tripping the diagnostic on the adapter's
+       * most common path.
+       */
+      const children = untrack(() => _props.children)
       return (
         <form.Field {...fieldProps}>
           {(field) => (
             <opts.fieldContext value={field}>
               {createComponent(
-                () =>
-                  _props.children(Object.assign(field, opts.fieldComponents)),
+                () => children(Object.assign(field, opts.fieldComponents)),
                 {},
               )}
             </opts.fieldContext>
