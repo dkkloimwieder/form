@@ -1,12 +1,13 @@
 import { FormGroupApi, functionalUpdate } from '@tanstack/form-core'
 import {
   createComponent,
-  createComputed,
-  createSignal,
-  onCleanup,
-  onMount,
+  createMemo,
+  createRenderEffect,
+  onSettled,
+  untrack,
 } from 'solid-js'
 import { useSelector } from '@tanstack/solid-store'
+import { trackOptions } from './reactivity'
 import type {
   DeepKeys,
   DeepValue,
@@ -17,7 +18,8 @@ import type {
   FormGroupValidateOrFn,
   FormValidateOrFn,
 } from '@tanstack/form-core'
-import type { Accessor, JSX, JSXElement } from 'solid-js'
+import type { Accessor } from 'solid-js'
+import type { JSX } from '@solidjs/web'
 
 // ugly way to trick solid into triggering updates for changes on the formGroupApi
 function makeFormGroupReactive<
@@ -112,16 +114,37 @@ function makeFormGroupReactive<
   TFormOnServer,
   TParentSubmitMeta
 > {
-  const [group, setGroup] = createSignal(formGroupApi, { equals: false })
-  // Handle shallow comparison to make sure that Derived doesn't create a new setGroup call every time
-  const store = useSelector(formGroupApi.store, (store) => store)
-  // Run before initial render
-  createComputed(() => {
-    // Use the store to track dependencies
-    store()
-    setGroup(formGroupApi)
-  })
-  return group
+  // Identity selector: @tanstack/store hands out a new snapshot object per
+  // write, so `===` on the snapshot already deduplicates — this subscribes to
+  // every state change without republishing on writes that changed nothing.
+  const store = useSelector(formGroupApi.store, (state) => state)
+
+  /**
+   * The `FormGroupApi` instance is identity-stable; only its store changes. So
+   * the memo exists purely to republish that identity whenever the store moves,
+   * which is what makes `formGroup().state` re-render.
+   *
+   * `equals: false` is load-bearing, not cosmetic: with Solid's default
+   * reference equality this memo would recompute and then decline to notify,
+   * because it returns the same object every time — downstream would update
+   * exactly once, at creation, and never again.
+   *
+   * Solid 1 did this with `createSignal(api, { equals: false })` plus a
+   * `createComputed` that re-emitted the same identity. Under Solid 2 that
+   * shape needs `ownedWrite: true` (the render effect's effect half runs
+   * synchronously inside the owned component body) AND a braced effect body (a
+   * concise arrow returns the setter's value into the cleanup slot) — two ways
+   * to hard-halt the reactive system. A memo has no writer and no cleanup slot,
+   * so it has neither.
+   */
+  return createMemo(
+    () => {
+      // Use the store to track dependencies
+      store()
+      return formGroupApi
+    },
+    { equals: false, name: 'form/formGroup' },
+  )
 }
 
 export function createFormGroup<
@@ -191,31 +214,53 @@ export function createFormGroup<
     TParentSubmitMeta
   >,
 ) {
-  const options = opts()
+  // untracked: constructor seed only; the render effect below keeps the
+  // instance current. Reading it bare emits STRICT_READ_UNTRACKED once per
+  // form group.
+  const options = untrack(opts)
 
   const api = new FormGroupApi(options)
 
   let mounted = false
-  // Instantiates form group meta and removes it when unrendered
-  onMount(() => {
+  /**
+   * Instantiates form group meta and removes it when unrendered.
+   *
+   * `onSettled` replaces Solid 1's `onMount`, and its RETURN VALUE is the
+   * cleanup — `onCleanup` throws [CLEANUP_IN_FORBIDDEN_SCOPE] inside an
+   * `onSettled` callback, so the nested-onCleanup shape is not portable.
+   */
+  onSettled(() => {
     const cleanupFn = api.mount()
     mounted = true
-    onCleanup(() => {
+    return () => {
       cleanupFn()
       mounted = false
-    })
+    }
   })
 
   /**
    * formGroupApi.update should not have any side effects. Think of it like a `useRef`
    * that we need to keep updated every render with the most up-to-date information.
    *
-   * createComputed to make sure this effect runs before render effects
+   * createRenderEffect to make sure this runs ahead of ordinary effects, the
+   * Solid 2 stand-in for Solid 1's createComputed ordering.
+   *
+   * The `mounted` guard stays, and `{ defer: true }` is NOT a substitute: defer
+   * skips only the FIRST run, whereas Solid 1 skipped EVERY run until mount.
+   * That window is reachable — `onSettled` fires after the render queue drains,
+   * so a sibling group mounting in the same flush can dirty this group's deps
+   * and drive `api.update()` before `api.mount()`.
    */
-  createComputed(() => {
-    if (!mounted) return
-    api.update(opts())
-  })
+  createRenderEffect(
+    () => trackOptions(opts()),
+    (nextOptions) => {
+      if (!mounted) return
+      // untracked: form-core reads option getters in here, and the dev build
+      // flags each one as [STRICT_READ_UNTRACKED] even though the compute half
+      // above already subscribed to them.
+      untrack(() => api.update(nextOptions))
+    },
+  )
 
   return makeFormGroupReactive<
     TParentData,
@@ -424,7 +469,7 @@ export type FormGroupComponent<
     TParentSubmitMeta,
     ExtendedApi
   >,
-) => JSXElement
+) => JSX.Element
 
 interface FormGroupComponentProps<
   TParentData,
@@ -518,7 +563,7 @@ interface FormGroupComponentProps<
       TFormOnServer,
       TParentSubmitMeta
     >,
-  ) => JSXElement
+  ) => JSX.Element
 }
 
 export function FormGroup<
