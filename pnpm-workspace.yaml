@@ -39,6 +39,11 @@ packages:
   - examples/react/**
   - examples/preact/**
   - examples/solid/**
+  # Parked for the Solid 2 transition: this example depends on
+  # @tanstack/solid-form-devtools -> @tanstack/form-devtools, both Solid 1 source
+  # with no Solid 2 line upstream, and vite-plugin-solid@3 enforces a single Solid
+  # runtime by design. Source and docs stay in-tree — see the example's README.
+  - '!examples/solid/devtools'
   - examples/vue/**
   - examples/lit/**
   - examples/svelte/**

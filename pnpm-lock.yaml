@@ -1228,31 +1228,6 @@ importers:
         specifier: ^2.11.8
         version: 2.11.12(@testing-library/jest-dom@6.9.1)(solid-js@1.9.13)(vite@7.3.3(@types/node@24.12.4)(jiti@2.7.0)(less@4.6.4)(lightningcss@1.32.0)(sass@1.100.0)(sugarss@5.0.1(postcss@8.5.15))(terser@5.48.0)(yaml@2.9.0))
 
-  examples/solid/devtools:
-    dependencies:
-      '@tanstack/solid-devtools':
-        specifier: ^0.7.7
-        version: 0.7.33(csstype@3.2.3)(solid-js@1.9.13)
-      '@tanstack/solid-form':
-        specifier: ^1.33.3
-        version: link:../../../packages/solid-form
-      '@tanstack/solid-form-devtools':
-        specifier: workspace:*
-        version: link:../../../packages/solid-form-devtools
-      solid-js:
-        specifier: ^1.9.9
-        version: 1.9.13
-    devDependencies:
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-      vite:
-        specifier: ^7.2.2
-        version: 7.3.3(@types/node@24.12.4)(jiti@2.7.0)(less@4.6.4)(lightningcss@1.32.0)(sass@1.100.0)(sugarss@5.0.1(postcss@8.5.15))(terser@5.48.0)(yaml@2.9.0)
-      vite-plugin-solid:
-        specifier: ^2.11.8
-        version: 2.11.12(@testing-library/jest-dom@6.9.1)(solid-js@1.9.13)(vite@7.3.3(@types/node@24.12.4)(jiti@2.7.0)(less@4.6.4)(lightningcss@1.32.0)(sass@1.100.0)(sugarss@5.0.1(postcss@8.5.15))(terser@5.48.0)(yaml@2.9.0))
-
   examples/solid/large-form:
     dependencies:
       '@tanstack/solid-form':
@@ -6725,12 +6700,6 @@ packages:
   '@tanstack/router-utils@1.162.2':
     resolution: {integrity: sha512-hTWqJtqIFFdvuCl8WXNyrodp2L9zo2G37xKRrcVmVRWpAB2h+U1LuRAfS4tsFTiWOIoE/B+WDVFB8JpoEdw6jQ==}
     engines: {node: '>=20.19'}
-
-  '@tanstack/solid-devtools@0.7.33':
-    resolution: {integrity: sha512-KG1KYqptJ39088ygeZM4EG9RTaqLy0Ej1ygHkL+Mv+PtFJI/VMXnyxdV6xx5KC8nFf46qHhWe5+GhtoR6RnLFA==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      solid-js: '>=1.9.7'
 
   '@tanstack/solid-store@0.11.0':
     resolution: {integrity: sha512-2isL0ZnnyI1iN0V+QPrxE3OcPndohBgVlBcHZYoAOIAiU1WoWjVy0q5gb0suPu1Id0h5cKC23JnwzQTxWDZD0w==}
@@ -19914,15 +19883,6 @@ snapshots:
       tinyglobby: 0.2.16
     transitivePeerDependencies:
       - supports-color
-
-  '@tanstack/solid-devtools@0.7.33(csstype@3.2.3)(solid-js@1.9.13)':
-    dependencies:
-      '@tanstack/devtools': 0.10.14(csstype@3.2.3)(solid-js@1.9.13)
-      solid-js: 1.9.13
-    transitivePeerDependencies:
-      - bufferutil
-      - csstype
-      - utf-8-validate
 
   '@tanstack/solid-store@0.11.0(solid-js@1.9.13)':
     dependencies:
