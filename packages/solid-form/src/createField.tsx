@@ -1,12 +1,13 @@
 import { FieldApi } from '@tanstack/form-core'
 import {
   createComponent,
-  createComputed,
-  createSignal,
-  onCleanup,
-  onMount,
+  createMemo,
+  createRenderEffect,
+  onSettled,
+  untrack,
 } from 'solid-js'
 import { useSelector } from '@tanstack/solid-store'
+import { trackOptions } from './reactivity'
 import type {
   DeepKeys,
   DeepValue,
@@ -17,7 +18,8 @@ import type {
   FormValidateOrFn,
 } from '@tanstack/form-core'
 
-import type { Accessor, JSX, JSXElement } from 'solid-js'
+import type { Accessor } from 'solid-js'
+import type { JSX } from '@solidjs/web'
 import type {
   CreateFieldOptions,
   CreateFieldOptionsBound,
@@ -167,7 +169,6 @@ function makeFieldReactive<
     TFormOnServer,
     TParentSubmitMeta
   > {
-  const [field, setField] = createSignal(fieldApi, { equals: false })
   // Subscribe to the pieces of state that should trigger a re-render of the
   // field. For array mode, we only track the length of the array value to
   // avoid re-renders when child properties change. Meta is tracked piece by
@@ -200,19 +201,38 @@ function makeFieldReactive<
     fieldApi.store,
     (state) => state.meta.isValidating,
   )
-  // Run before initial render
-  createComputed(() => {
-    // Read all reactive sources to track them as dependencies
-    reactiveStateValue()
-    reactiveMetaIsTouched()
-    reactiveMetaIsBlurred()
-    reactiveMetaIsDirty()
-    reactiveMetaErrorMap()
-    reactiveMetaErrorSourceMap()
-    reactiveMetaIsValidating()
-    setField(fieldApi)
-  })
-  return field
+  /**
+   * The `FieldApi` instance is identity-stable; only its store changes. So the
+   * memo exists purely to republish that identity whenever a tracked slice
+   * moves, which is what makes `field().state.value` re-render.
+   *
+   * `equals: false` is load-bearing, not cosmetic: with Solid's default
+   * reference equality this memo would recompute and then decline to notify,
+   * because it returns the same object every time — downstream would update
+   * exactly once, at creation, and never again.
+   *
+   * Solid 1 did this with `createSignal(api, { equals: false })` plus a
+   * `createComputed` that re-emitted the same identity. Under Solid 2 that
+   * shape needs `ownedWrite: true` (the render effect's effect half runs
+   * synchronously inside the owned component body) AND a braced effect body (a
+   * concise arrow returns the setter's value into the cleanup slot) — two ways
+   * to hard-halt the reactive system. A memo has no writer and no cleanup slot,
+   * so it has neither.
+   */
+  return createMemo(
+    () => {
+      // Read all reactive sources to track them as dependencies
+      reactiveStateValue()
+      reactiveMetaIsTouched()
+      reactiveMetaIsBlurred()
+      reactiveMetaIsDirty()
+      reactiveMetaErrorMap()
+      reactiveMetaErrorSourceMap()
+      reactiveMetaIsValidating()
+      return fieldApi
+    },
+    { equals: false, name: 'form/field' },
+  )
 }
 
 export function createField<
@@ -274,33 +294,54 @@ export function createField<
     TParentSubmitMeta
   >,
 ) {
-  const options = opts()
+  // untracked: constructor seed only; the render effect below keeps the
+  // instance current. Reading it bare emits STRICT_READ_UNTRACKED once per field.
+  const options = untrack(opts)
 
   const api = new FieldApi(options)
 
   const extendedApi: typeof api = api as never
 
   let mounted = false
-  // Instantiates field meta and removes it when unrendered
-  onMount(() => {
+  /**
+   * Instantiates field meta and removes it when unrendered.
+   *
+   * `onSettled` replaces Solid 1's `onMount`, and its RETURN VALUE is the
+   * cleanup — `onCleanup` throws [CLEANUP_IN_FORBIDDEN_SCOPE] inside an
+   * `onSettled` callback, so the nested-onCleanup shape is not portable.
+   */
+  onSettled(() => {
     const cleanupFn = api.mount()
     mounted = true
-    onCleanup(() => {
+    return () => {
       cleanupFn()
       mounted = false
-    })
+    }
   })
 
   /**
    * fieldApi.update should not have any side effects. Think of it like a `useRef`
    * that we need to keep updated every render with the most up-to-date information.
    *
-   * createComputed to make sure this effect runs before render effects
+   * createRenderEffect to make sure this runs ahead of ordinary effects, the
+   * Solid 2 stand-in for Solid 1's createComputed ordering.
+   *
+   * The `mounted` guard stays, and `{ defer: true }` is NOT a substitute: defer
+   * skips only the FIRST run, whereas Solid 1 skipped EVERY run until mount.
+   * That window is reachable — `onSettled` fires after the render queue drains,
+   * so a sibling field mounting in the same flush can dirty this field's deps
+   * and drive `api.update()` before `api.mount()`.
    */
-  createComputed(() => {
-    if (!mounted) return
-    api.update(opts())
-  })
+  createRenderEffect(
+    () => trackOptions(opts()),
+    (nextOptions) => {
+      if (!mounted) return
+      // untracked: form-core reads option getters in here, and the dev build
+      // flags each one as [STRICT_READ_UNTRACKED] even though the compute half
+      // above already subscribed to them.
+      untrack(() => api.update(nextOptions))
+    },
+  )
 
   return makeFieldReactive<
     TParentData,
@@ -566,7 +607,7 @@ interface FieldComponentProps<
       TFormOnServer,
       TParentSubmitMeta
     >,
-  ) => JSXElement
+  ) => JSX.Element
 }
 
 /**
