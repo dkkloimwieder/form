@@ -1271,12 +1271,15 @@ importers:
 
   examples/solid/simple:
     dependencies:
+      '@solidjs/web':
+        specifier: 2.0.0-beta.30
+        version: 2.0.0-beta.30(solid-js@2.0.0-beta.30)
       '@tanstack/solid-form':
         specifier: ^1.33.3
         version: link:../../../packages/solid-form
       solid-js:
-        specifier: ^1.9.9
-        version: 1.9.13
+        specifier: 2.0.0-beta.30
+        version: 2.0.0-beta.30
     devDependencies:
       typescript:
         specifier: 5.9.3
@@ -1285,8 +1288,8 @@ importers:
         specifier: ^7.2.2
         version: 7.3.3(@types/node@24.12.4)(jiti@2.7.0)(less@4.6.4)(lightningcss@1.32.0)(sass@1.100.0)(sugarss@5.0.1(postcss@8.5.15))(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
-        specifier: ^2.11.8
-        version: 2.11.12(@testing-library/jest-dom@6.9.1)(solid-js@1.9.13)(vite@7.3.3(@types/node@24.12.4)(jiti@2.7.0)(less@4.6.4)(lightningcss@1.32.0)(sass@1.100.0)(sugarss@5.0.1(postcss@8.5.15))(terser@5.48.0)(yaml@2.9.0))
+        specifier: 3.0.0-next.21
+        version: 3.0.0-next.21(@solidjs/web@2.0.0-beta.30(solid-js@2.0.0-beta.30))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.30)(vite@7.3.3(@types/node@24.12.4)(jiti@2.7.0)(less@4.6.4)(lightningcss@1.32.0)(sass@1.100.0)(sugarss@5.0.1(postcss@8.5.15))(terser@5.48.0)(yaml@2.9.0))
 
   examples/solid/standard-schema:
     dependencies:
