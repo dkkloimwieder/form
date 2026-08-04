@@ -1,15 +1,16 @@
 import { FormApi, functionalUpdate } from '@tanstack/form-core'
-import { createComputed, onMount } from 'solid-js'
+import { createRenderEffect, onSettled, untrack } from 'solid-js'
 import { useSelector } from '@tanstack/solid-store'
 import { Field, createField } from './createField'
 import { FormGroup } from './createFormGroup'
+import { trackOptions } from './reactivity'
 import type {
   FormAsyncValidateOrFn,
   FormOptions,
   FormState,
   FormValidateOrFn,
 } from '@tanstack/form-core'
-import type { JSXElement } from 'solid-js'
+import type { JSX } from '@solidjs/web'
 import type { FieldComponent } from './createField'
 import type { FormGroupComponent } from './createFormGroup'
 
@@ -162,8 +163,8 @@ export interface SolidFormApi<
         >
       >,
     ) => TSelected
-    children: ((state: () => NoInfer<TSelected>) => JSXElement) | JSXElement
-  }) => JSXElement
+    children: ((state: () => NoInfer<TSelected>) => JSX.Element) | JSX.Element
+  }) => JSX.Element
 }
 
 /**
@@ -239,7 +240,9 @@ export function createForm<
     TSubmitMeta
   >,
 ) {
-  const options = opts?.()
+  // untracked: constructor seed only; the render effect below keeps the
+  // instance current. Reading it bare emits STRICT_READ_UNTRACKED once per form.
+  const options = untrack(() => opts?.())
   const api = new FormApi<
     TParentData,
     TFormOnMount,
@@ -278,13 +281,28 @@ export function createForm<
   extendedApi.Subscribe = (props) =>
     functionalUpdate(props.children, useSelector(api.store, props.selector))
 
-  onMount(api.mount)
+  onSettled(() => api.mount())
 
   /**
    * formApi.update should not have any side effects. Think of it like a `useRef`
    * that we need to keep updated every render with the most up-to-date information.
+   *
+   * `createRenderEffect`, not `createEffect`: its effect half runs in the render
+   * queue, ahead of ordinary effects and ahead of `onSettled` — the Solid 2
+   * stand-in for Solid 1's `createComputed` ordering. Its first run is
+   * synchronous, during setup, so the initial push still happens before mount.
+   *
+   * `trackOptions` in the compute half is load-bearing — see its doc comment.
    */
-  createComputed(() => api.update(opts?.()))
+  createRenderEffect(
+    () => trackOptions(opts?.()),
+    (nextOptions) => {
+      // untracked: form-core reads option getters in here, and the dev build
+      // flags each one as [STRICT_READ_UNTRACKED] even though the compute half
+      // above already subscribed to them.
+      untrack(() => api.update(nextOptions))
+    },
+  )
 
   return extendedApi
 }
