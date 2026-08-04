@@ -1,7 +1,8 @@
 import { FieldGroupApi, functionalUpdate } from '@tanstack/form-core'
 import { useSelector } from '@tanstack/solid-store'
-import { onCleanup, onMount } from 'solid-js'
-import type { Component, JSX, ParentProps } from 'solid-js'
+import { onSettled } from 'solid-js'
+import type { Accessor, Component, ParentProps } from 'solid-js'
+import type { JSX } from '@solidjs/web'
 import type {
   DeepKeysOfType,
   FieldGroupState,
@@ -67,7 +68,9 @@ export type AppFieldExtendedSolidFieldGroupApi<
      */
     Subscribe: <TSelected = NoInfer<FieldGroupState<TFieldGroupData>>>(props: {
       selector?: (state: NoInfer<FieldGroupState<TFieldGroupData>>) => TSelected
-      children: ((state: NoInfer<TSelected>) => JSX.Element) | JSX.Element
+      children:
+        | ((state: Accessor<NoInfer<TSelected>>) => JSX.Element)
+        | JSX.Element
     }) => JSX.Element
   }
 
@@ -203,18 +206,36 @@ export function createFieldGroup<
   extendedApi.Subscribe = (props) => {
     const data = useSelector(api.store, props.selector)
 
-    return functionalUpdate(props.children, data()) as Element
+    /**
+     * Pass the ACCESSOR, not `data()`.
+     *
+     * `createComponent` runs component bodies inside `untrack`, in Solid 1 as
+     * well, so reading here handed the child a value frozen at first render:
+     * `{(lastName) => lastName}` inserted a plain string once and never updated
+     * again. Solid 2 does not cause that bug, it only names it —
+     * [STRICT_READ_UNTRACKED] is the diagnostic for exactly this shape.
+     *
+     * This is a typed, visible API break: children go from `(v) => …v…` to
+     * `(v) => …v()…`. It makes `fieldGroup.Subscribe` consistent with
+     * `form.Subscribe`, which already passes the accessor. The `as Element`
+     * cast that used to be here was casting to the DOM lib's global `Element`,
+     * unrelated to Solid's element type, and only compiled because
+     * `functionalUpdate`'s output type is unconstrained.
+     */
+    return functionalUpdate(props.children, data)
   }
 
-  let mounted = false
-  onMount(() => {
-    const cleanupFn = api.mount()
-    mounted = true
-    onCleanup(() => {
-      cleanupFn()
-      mounted = false
-    })
-  })
+  /**
+   * `onSettled` replaces Solid 1's `onMount`, and its RETURN VALUE is the
+   * cleanup — `onCleanup` throws [CLEANUP_IN_FORBIDDEN_SCOPE] inside an
+   * `onSettled` callback, so the nested-onCleanup shape is not portable.
+   *
+   * Unlike the other adapters this keeps no `mounted` flag. The Solid 1 one was
+   * dead — written here, read nowhere — because a field group has no options
+   * push loop for a guard to protect, and `FieldGroupApi.mount()` returns a
+   * no-op cleanup.
+   */
+  onSettled(() => api.mount())
 
   return Object.assign(extendedApi, {
     ...options.formComponents,
