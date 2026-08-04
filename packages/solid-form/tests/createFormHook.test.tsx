@@ -272,7 +272,7 @@ describe('createFormHook', () => {
               )}
             />
             <group.Subscribe selector={(state) => state.values.lastName}>
-              {(lastName) => <p>{lastName}</p>}
+              {(lastName) => <p>{lastName()}</p>}
             </group.Subscribe>
           </div>
         )
@@ -325,7 +325,7 @@ describe('createFormHook', () => {
               )}
             />
             <group.Subscribe selector={(state) => state.values.lastName}>
-              {(lastName) => <p>{lastName}</p>}
+              {(lastName) => <p>{lastName()}</p>}
             </group.Subscribe>
           </div>
         )
@@ -593,9 +593,14 @@ describe('createFormHook', () => {
       ...formOpts,
       props: { status: 'idle' as 'idle' | 'loading' },
       render: (props) => {
-        createEffect(() => {
-          spy(props.status)
-        })
+        // Solid 2 requires both halves: the compute half tracks, the effect
+        // half runs untracked. One argument throws [MISSING_EFFECT_FN].
+        createEffect(
+          () => props.status,
+          (status) => {
+            spy(status)
+          },
+        )
         return <div data-testid="status">{props.status}</div>
       },
     })
