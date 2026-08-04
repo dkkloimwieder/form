@@ -295,7 +295,9 @@ export function createField<
   >,
 ) {
   // untracked: constructor seed only; the render effect below keeps the
-  // instance current. Reading it bare emits STRICT_READ_UNTRACKED once per field.
+  // instance current. This does NOT silence the STRICT_READ_UNTRACKED that
+  // seeding produces for getter-form options — `untrack` stops a read from
+  // SUBSCRIBING, not from being reported. See createForm.tsx.
   const options = untrack(opts)
 
   const api = new FieldApi(options)

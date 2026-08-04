@@ -241,7 +241,11 @@ export function createForm<
   >,
 ) {
   // untracked: constructor seed only; the render effect below keeps the
-  // instance current. Reading it bare emits STRICT_READ_UNTRACKED once per form.
+  // instance current. Note this does NOT silence the STRICT_READ_UNTRACKED that
+  // seeding produces for getter-form options — measured, the count is identical
+  // with and without it, because `untrack` stops a read from SUBSCRIBING rather
+  // than from being reported. What it buys is that a caller who builds a form
+  // inside a tracked scope does not make the seed a dependency of it.
   const options = untrack(() => opts?.())
   const api = new FormApi<
     TParentData,
