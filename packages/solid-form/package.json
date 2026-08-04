@@ -57,14 +57,17 @@
   ],
   "dependencies": {
     "@tanstack/form-core": "workspace:*",
-    "@tanstack/solid-store": "^0.11.0"
+    "@tanstack/solid-store": "github:dkkloimwieder/store#9709dab20a007c3e9dc2cd8cee0960d57e38cbea&path:/packages/solid-store"
   },
   "devDependencies": {
-    "solid-js": "^1.9.9",
+    "@solidjs/testing-library": "1.0.0-beta.2",
+    "@solidjs/web": "2.0.0-beta.30",
+    "solid-js": "2.0.0-beta.30",
     "vite": "^7.2.2",
-    "vite-plugin-solid": "^2.11.8"
+    "vite-plugin-solid": "3.0.0-next.21"
   },
   "peerDependencies": {
-    "solid-js": ">=1.9.9"
+    "@solidjs/web": ">=2.0.0-beta.30 <3.0.0",
+    "solid-js": ">=2.0.0-beta.30 <3.0.0"
   }
 }
