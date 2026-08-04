@@ -1,4 +1,4 @@
-import { FormGroupApi, functionalUpdate } from '@tanstack/form-core'
+import { FormGroupApi } from '@tanstack/form-core'
 import {
   createComponent,
   createMemo,

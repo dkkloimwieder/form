@@ -1,7 +1,7 @@
 import { FormApi, functionalUpdate } from '@tanstack/form-core'
 import { createRenderEffect, onSettled, untrack } from 'solid-js'
 import { useSelector } from '@tanstack/solid-store'
-import { Field, createField } from './createField'
+import { Field } from './createField'
 import { FormGroup } from './createFormGroup'
 import { trackOptions } from './reactivity'
 import type {
