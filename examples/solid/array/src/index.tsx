@@ -1,8 +1,8 @@
 /* @refresh reload */
-import { render } from 'solid-js/web'
+import { render } from '@solidjs/web'
 
 import { createForm } from '@tanstack/solid-form'
-import { Index, Show } from 'solid-js'
+import { For, Show } from 'solid-js'
 
 function App() {
   const form = createForm(() => ({
@@ -25,8 +25,10 @@ function App() {
           {(field) => (
             <div>
               <Show when={field().state.value.length > 0}>
-                {/* Do not change this to For or the test will fail */}
-                <Index each={field().state.value}>
+                {/* Must stay non-keyed: with the default keyed={true} the row
+                    remounts on every value change and the test fails.
+                    `keyed={false}` is the Solid 1 `<Index>` this replaces. */}
+                <For each={field().state.value} keyed={false}>
                   {(_, i) => (
                     <form.Field name={`people[${i}].name`}>
                       {(subField) => (
@@ -44,7 +46,7 @@ function App() {
                       )}
                     </form.Field>
                   )}
-                </Index>
+                </For>
               </Show>
 
               <button
