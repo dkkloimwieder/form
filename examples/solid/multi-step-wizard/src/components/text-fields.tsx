@@ -1,11 +1,18 @@
-import { For } from 'solid-js'
+import { For, untrack } from 'solid-js'
 import { useStore } from '@tanstack/solid-form'
 import { useFieldContext } from '../hooks/form-context.tsx'
 
 export function TextField(props: { label: string }) {
   const field = useFieldContext<string>()
 
-  const errors = useStore(field().store, (state) => state.meta.errors)
+  // `untrack`: the FieldApi identity is stable for the life of the field, so
+  // reading `.store` off it once is correct — the selector below stays live.
+  // Without it Solid reports the component-body read as [STRICT_READ_UNTRACKED],
+  // one per rendered field.
+  const errors = useStore(
+    untrack(() => field().store),
+    (state) => state.meta.errors,
+  )
 
   return (
     <div>
