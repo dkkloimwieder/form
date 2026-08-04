@@ -15,6 +15,24 @@ trustPolicyExclude:
 # Too young to use currently, upgrade in a few days
 overrides: { 'tinyexec': '1.1.2' }
 
+# Solid 2 transition (remove at Solid 2 GA): @solidjs/testing-library@1.0.0-beta.2
+# declares `>=2.0.0` peers, and semver only admits a prerelease into a range when
+# some comparator in that range shares its [major,minor,patch] tuple — so `>=2.0.0`
+# does not match `2.0.0-beta.30` and pnpm reports two unmet peers.
+#
+# This is cosmetic only: pnpm still links the single Solid 2 copy it has, verified
+# by the peer-suffixed store directory
+# `@solidjs+testing-library@1.0.0-beta.2_@solidjs+web@2.0.0-beta.30_solid-js@2.0.0-beta.30__solid-js@2.0.0-beta.30`.
+# So this silences a warning; it does not steer resolution.
+#
+# NOT packageExtensions: pnpm's packageExtensions are purely additive and cannot
+# replace a peer range that the published manifest already declares — measured,
+# an extension adds new keys but leaves `solid-js: '>=2.0.0'` untouched.
+peerDependencyRules:
+  allowedVersions:
+    '@solidjs/testing-library>solid-js': '>=2.0.0-0 <3.0.0'
+    '@solidjs/testing-library>@solidjs/web': '>=2.0.0-0 <3.0.0'
+
 packages:
   - packages/**
   - examples/angular/**
