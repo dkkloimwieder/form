@@ -1900,10 +1900,10 @@ importers:
       '@tanstack/form-devtools':
         specifier: workspace:*
         version: link:../form-devtools
-      solid-js:
-        specifier: '>=1.9.7'
-        version: 1.9.13
     devDependencies:
+      solid-js:
+        specifier: ^1.9.9
+        version: 1.9.13
       vite-plugin-solid:
         specifier: ^2.11.8
         version: 2.11.12(@testing-library/jest-dom@6.9.1)(solid-js@1.9.13)(vite@7.3.3(@types/node@24.12.4)(jiti@2.7.0)(less@4.6.4)(lightningcss@1.32.0)(sass@1.100.0)(sugarss@5.0.1(postcss@8.5.15))(terser@5.48.0)(yaml@2.9.0))
