@@ -1,12 +1,7 @@
-import {
-  createComponent,
-  createContext,
-  mergeProps,
-  splitProps,
-  useContext,
-} from 'solid-js'
+import { createComponent, createContext, omit, useContext } from 'solid-js'
 import { createFieldGroup } from './createFieldGroup'
 import { createForm } from './createForm'
+import { mergeObjects } from './merge-objects'
 import type {
   AnyFieldApi,
   AnyFormApi,
@@ -18,13 +13,8 @@ import type {
   FormOptions,
   FormValidateOrFn,
 } from '@tanstack/form-core'
-import type {
-  Accessor,
-  Component,
-  Context,
-  JSXElement,
-  ParentProps,
-} from 'solid-js'
+import type { Accessor, Component, Context, ParentProps } from 'solid-js'
+import type { JSX } from '@solidjs/web'
 import type { FieldComponent } from './createField'
 import type { AppFieldExtendedSolidFieldGroupApi } from './createFieldGroup'
 import type { SolidFormExtendedApi } from './createForm'
@@ -67,15 +57,20 @@ type UnwrapDefaultOrAny<DefaultT, T> = [DefaultT] extends [T]
   : T
 
 export function createFormHookContexts() {
-  // We should never hit the `null` case here
-  const fieldContext = createContext<Accessor<AnyFieldApi>>(
-    null as unknown as Accessor<AnyFieldApi>,
-  )
+  /**
+   * The `| null` is honest rather than defensive: `useContext` returns the
+   * default when there is no provider above, and the guard below is what turns
+   * that into the package's own message.
+   *
+   * Solid 2's default-less `createContext<T>()` is the idiomatic form and is
+   * deliberately NOT used here — it throws `ContextNotFoundError` from
+   * `useContext`, which would pre-empt that message with a generic one.
+   */
+  const fieldContext = createContext<Accessor<AnyFieldApi> | null>(null)
 
   function useFieldContext<TData>() {
     const field = useContext(fieldContext)
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!field) {
       throw new Error(
         '`fieldContext` only works when within a `fieldComponent` passed to `createFormHook`',
@@ -111,13 +106,12 @@ export function createFormHookContexts() {
     >
   }
 
-  // We should never hit the `null` case here
-  const formContext = createContext<AnyFormApi>(null as unknown as AnyFormApi)
+  /** See `fieldContext` above for why this is a `| null` union and not a cast. */
+  const formContext = createContext<AnyFormApi | null>(null)
 
   function useFormContext() {
     const form = useContext(formContext)
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!form) {
       throw new Error(
         '`formContext` only works when within a `formComponent` passed to `createFormHook`',
@@ -149,9 +143,9 @@ interface CreateFormHookProps<
   TFormComponents extends Record<string, Component<any>>,
 > {
   fieldComponents: TFieldComponents
-  fieldContext: Context<Accessor<AnyFieldApi>>
+  fieldContext: Context<Accessor<AnyFieldApi> | null>
   formComponents: TFormComponents
-  formContext: Context<AnyFormApi>
+  formContext: Context<AnyFormApi | null>
 }
 /**
  * @private
@@ -257,7 +251,7 @@ export interface WithFormProps<
         >
       }
     >,
-  ) => JSXElement
+  ) => JSX.Element
 }
 
 export interface WithFieldGroupProps<
@@ -294,7 +288,7 @@ export interface WithFieldGroupProps<
         >
       }
     >,
-  ) => JSXElement
+  ) => JSX.Element
 }
 
 export function createFormHook<
@@ -349,28 +343,33 @@ export function createFormHook<
   > {
     const form = createForm(props)
 
+    // A Solid 2 context object IS its provider component — `.Provider` is gone.
+    // Left as-is this would compile to `createComponent(undefined, …)`, a
+    // runtime crash rather than a type error, because the member access sits on
+    // a `Context`.
     const AppForm = ((formProps) => {
       return (
-        <opts.formContext.Provider value={form}>
-          {formProps.children}
-        </opts.formContext.Provider>
+        <opts.formContext value={form}>{formProps.children}</opts.formContext>
       )
     }) as Component<ParentProps>
 
     const AppField = ((_props) => {
-      const [childProps, fieldProps] = splitProps(_props, ['children'])
+      // `omit` replaces `splitProps`, returning ONLY the rest — a live proxy
+      // that preserves per-key tracking, so the spread below stays reactive.
+      // The picked half is read straight off `_props`, and reading it inside
+      // the children callback rather than in the untracked component body is
+      // strictly better than the Solid 1 shape it replaces.
+      const fieldProps = omit(_props, 'children')
       return (
         <form.Field {...fieldProps}>
           {(field) => (
-            <opts.fieldContext.Provider value={field}>
+            <opts.fieldContext value={field}>
               {createComponent(
                 () =>
-                  childProps.children(
-                    Object.assign(field, opts.fieldComponents),
-                  ),
+                  _props.children(Object.assign(field, opts.fieldComponents)),
                 {},
               )}
-            </opts.fieldContext.Provider>
+            </opts.fieldContext>
           )}
         </form.Field>
       )
@@ -469,10 +468,14 @@ export function createFormHook<
     UnwrapOrAny<TFormComponents>,
     UnwrapOrAny<TRenderProps>
   >['render'] {
+    // mergeObjects, not Solid 2's `merge`: `merge` resolves a key from the
+    // right-most source that HAS it, so a caller-supplied prop that happens to
+    // be `undefined` erases the declared default rather than falling through to
+    // it. See src/merge-objects.ts.
     return (innerProps) =>
       createComponent(
         render as Component<any>,
-        mergeProps(props ?? {}, innerProps),
+        mergeObjects(props ?? {}, innerProps),
       )
   }
 
@@ -549,18 +552,27 @@ export function createFormHook<
         fields: TFields
       }
     >,
-  ) => JSXElement {
+  ) => JSX.Element {
     return function Render(innerProps) {
+      // Getters, not eager reads: a component body is untracked, so reading
+      // `innerProps.form` here was one [STRICT_READ_UNTRACKED] per render. This
+      // does not make the group reactive — `createFieldGroup` has no options
+      // push loop — but the object stays live for FieldGroupApi's own later
+      // reads, and the diagnostic goes quiet.
       const fieldGroupProps = {
-        form: innerProps.form,
-        fields: innerProps.fields,
+        get form() {
+          return innerProps.form
+        },
+        get fields() {
+          return innerProps.fields
+        },
         defaultValues,
         formComponents: opts.formComponents,
       }
       const fieldGroupApi = createFieldGroup(() => fieldGroupProps)
       return createComponent(
         render as Component<any>,
-        mergeProps(props ?? {}, innerProps, { group: fieldGroupApi as any }),
+        mergeObjects(props ?? {}, innerProps, { group: fieldGroupApi as any }),
       )
     }
   }
