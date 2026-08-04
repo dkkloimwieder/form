@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@solidjs/testing-library'
 import { userEvent } from '@testing-library/user-event'
-import { Index, Show, createSignal, onCleanup } from 'solid-js'
+import { For, Show, createSignal, onCleanup } from 'solid-js'
 import { createForm } from '../src/index'
 import { sleep } from './utils'
 import type { FormValidationErrorMap } from '../src/index'
@@ -502,7 +502,7 @@ describe('createForm', () => {
         <>
           <form.Field name="foo" mode="array">
             {(arrayField) => (
-              <Index each={arrayField().state.value}>
+              <For each={arrayField().state.value} keyed={false}>
                 {(_, i) => (
                   <form.Field name={`foo[${i}].name`}>
                     {(field) => {
@@ -512,7 +512,7 @@ describe('createForm', () => {
                     }}
                   </form.Field>
                 )}
-              </Index>
+              </For>
             )}
           </form.Field>
           <button
@@ -560,7 +560,7 @@ describe('createForm', () => {
                     Add Item
                   </button>
                   <div>
-                    <Index each={fieldArray().state.value}>
+                    <For each={fieldArray().state.value} keyed={false}>
                       {(_, index) => (
                         <form.Field name={`items[${index}]`}>
                           {(field) => (
@@ -573,7 +573,7 @@ describe('createForm', () => {
                           )}
                         </form.Field>
                       )}
-                    </Index>
+                    </For>
                   </div>
                 </div>
               )}
@@ -609,10 +609,11 @@ describe('createForm', () => {
         <>
           <form.Field name="foo" mode="array">
             {(arrayField) => (
-              // This unit test provides different result based on
-              // using For vs. Index. Unit test both
-              // once that's fixed.
-              <Index each={arrayField().state.value}>
+              // This unit test gives a different result under keyed vs
+              // non-keyed iteration. Cover both once that is fixed —
+              // `keyed={false}` here is the old `<Index>`, and the default
+              // `keyed` is the old `<For>`.
+              <For each={arrayField().state.value} keyed={false}>
                 {(_, i) => (
                   <form.Field name={`foo[${i}].name`}>
                     {(field) => {
@@ -622,7 +623,7 @@ describe('createForm', () => {
                     }}
                   </form.Field>
                 )}
-              </Index>
+              </For>
             )}
           </form.Field>
           <button
